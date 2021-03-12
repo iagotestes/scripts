@@ -24,6 +24,8 @@ MAX_FIT_TRY=3
 DEVICE=""
 DEVICE_TYPE=""
 DEVICE_MOUNTED=""
+DEVICE_DISK=""
+
 
 LOGS=""
 DEVICE_SIZE=""
@@ -129,11 +131,11 @@ function clear_device()
 		echo format
 		if [ "${DEVICE_TYPE,,}" = "ipod" ]; then
 			echo "ipod"
-			#format
+			#format_ipod
 			#set_device_size
 		elif [ "${DEVICE_TYPE,,}" = "flash disk" ]; then #USB
 			echo "flash disk"
-			#format
+			format_flash
 			#set_device_size	
 		else
 			echo "device type not compatible"
@@ -146,11 +148,24 @@ function clear_device()
 	
 }
 
-function format()
+function format_flash()
 {
-	echo ""	
-}
+	
+        for part in "$DEVICE_DISK"?; 
+	do
+                sudo umount "$part";
+        done
 
+        sudo wipefs --all "$DEVICE_DISK"
+        sudo parted -s -a optimal "$DEVICE_DISK" mklabel msdos mkpart primary 0% 100%
+        d=`date | awk '{print $1$2}'`
+        d="MUS${d^^}"
+        echo "$d"
+        sudo mkfs.vfat -n "$d" "${DEVICE_DISK}1"
+        sudo mkdir -p /media/"$USER"/"$d"
+        sudo mount "${DEVICE_DISK}1" /media/"$USER"/"$d"
+
+}
 
 function set_device_size()
 {
@@ -167,7 +182,7 @@ function set_device_type()
 		DEVICE_MOUNTED="$aux"
 		aux="${aux::-1}"
 	fi
-	 
+	DEVICE_DISK="$aux"
 	ex="sudo fdisk -l | grep -A1 '$aux' | grep -v \"$aux\" | awk '{print \$3,\$4}' | cut -d \$'\\n' -f1"
 	
 	DEVICE_TYPE="$( eval $ex )"
@@ -192,7 +207,7 @@ function main()
 	else 
 		echo '#################SELECT DEVICE#######################';
 		choose_device # set DEVICE selected
-		set_device_type # set DEVICE_TYPE (iPod | Flash Disk); set DEVICE_MOUNTED /dev/sdXN
+		set_device_type # set DEVICE_TYPE (iPod | Flash Disk); set DEVICE_MOUNTED /dev/sdXN; set DEVICE_DISK /dev/sdX
 		if [ -z "$DEVICE_TYPE" ]; then 
 			echo 'device type not identified';
 			exit 2
