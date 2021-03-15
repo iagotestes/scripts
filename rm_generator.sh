@@ -6,7 +6,7 @@
 #@date:		08/03/2021
 #@version:	1.0 (08/03/2021)
 #@description:	
-#The script fills an iPod or usb device with a list of randomized musics fetched from the directory 
+#The script fills an usb device with a list of randomized musics fetched from the directory 
 #tree where it is executed. It also creates a log file with the musics fetched, for 
 #the same musics shall not be repeated in the next execution.
 #@observation:	ubuntu 20.04; GNU bash version 5.0.17
@@ -25,9 +25,11 @@ DEVICE=""
 DEVICE_TYPE=""
 DEVICE_MOUNTED=""
 DEVICE_DISK=""
+DEVICE_NEW_MOUNT=""
 
-
-LOGS=""
+OUTPUT_DIR=""
+LOGS=()
+LOGS_DIR=""
 DEVICE_SIZE=""
 MUSICS=()
 
@@ -36,7 +38,7 @@ REGEX_VERIFY_DEVICES=""
 
 function verify_devices()
 {
-	aux=$(sudo fdisk -l | grep -iE 'Disk /dev/sd|Disk model' | awk 'NR%2{printf "%s",$0;next;}1' | grep -iE 'ipod|flash disk' | awk '{gsub(/\:/,"")}1'  | awk '{print $2"."}' | awk 'NR%10{printf "%s|",$0;next;}1')
+	aux=$(sudo fdisk -l | grep -iE 'Disk /dev/sd|Disk model' | awk 'NR%2{printf "%s",$0;next;}1' | grep -iE 'flash disk' | awk '{gsub(/\:/,"")}1'  | awk '{print $2"."}' | awk 'NR%10{printf "%s|",$0;next;}1')
 	if [ -z "$aux" ]; 
 	then 
 		REGEX_VERIFY_DEVICES=""
@@ -129,14 +131,10 @@ function clear_device()
 	if [[ "$var" == "y" ]];
 	then
 		echo format
-		if [ "${DEVICE_TYPE,,}" = "ipod" ]; then
-			echo "ipod"
-			#format_ipod
-			#set_device_size
-		elif [ "${DEVICE_TYPE,,}" = "flash disk" ]; then #USB
+		if [ "${DEVICE_TYPE,,}" = "flash disk" ]; then #USB
 			echo "flash disk"
 			format_flash
-			#set_device_size	
+			set_device_size	
 		else
 			echo "device type not compatible"
 			exit 4
@@ -160,16 +158,28 @@ function format_flash()
         sudo parted -s -a optimal "$DEVICE_DISK" mklabel msdos mkpart primary 0% 100%
         d=`date | awk '{print $1$2}'`
         d="MUS${d^^}"
-        echo "$d"
-        sudo mkfs.vfat -n "$d" "${DEVICE_DISK}1"
+	DEVICE_MOUNTED="${DEVICE_DISK}1"
+        sudo mkfs.vfat -n "$d" "$DEVICE_MOUNTED"
         sudo mkdir -p /media/"$USER"/"$d"
-        sudo mount "${DEVICE_DISK}1" /media/"$USER"/"$d"
+        DEVICE_NEW_MOUNT="/media/$USER/$d"
+	sudo mount "${DEVICE_DISK}1" "$DEVICE_NEW_MOUNT"   # /media/"$USER"/"$d"
+	
 
 }
 
 function set_device_size()
 {
-	echo ""
+	
+	DEVICE_SIZE=`df "$DEVICE_MOUNTED" | awk '{print $4}' | tail -1`
+	#check if is not a number
+	if [ ! "$DEVICE_SIZE" -eq "$DEVICE_SIZE" ] 2>/dev/null; then
+		echo "could not find device size"
+		exit 4
+	else
+		echo "device size: $DEVICE_SIZE"	
+	fi			
+
+	
 }
 
 function set_device_type()
@@ -196,6 +206,28 @@ function set_device_type()
 
 #}
 
+function create_or_read_logs()
+{	
+	DIR_NAME="./LOGS_RM"
+	LOGS_DIR="$DIR_NAME/logs"
+
+	if [[ ! -d "$DIR_NAME" ]]; then
+		mkdir "$DIR_NAME"
+		echo -n "" > "$LOGS_DIR"
+	elif [[ ! -f "$LOGS_DIR" ]]; then
+		echo -n "" > "$LOGS_DIR"
+	else
+		# fills LOGS with the entries of the file
+		while IFS= read -r line; do
+			LOGS+=( "$line" )
+		done < <( cat "$LOGS_DIR" ) 
+		echo "logs size: ${#LOGS[@]}"
+
+	fi
+	
+	
+}
+
 function main()
 {
 	verify_devices
@@ -205,16 +237,16 @@ function main()
 		exit 1
 	
 	else 
-		echo '#################SELECT DEVICE#######################';
+		echo '###################SELECT DEVICE#######################';
 		choose_device # set DEVICE selected
-		set_device_type # set DEVICE_TYPE (iPod | Flash Disk); set DEVICE_MOUNTED /dev/sdXN; set DEVICE_DISK /dev/sdX
+		set_device_type # set DEVICE_TYPE (Flash Disk); set DEVICE_MOUNTED /dev/sdXN; set DEVICE_DISK /dev/sdX
 		if [ -z "$DEVICE_TYPE" ]; then 
 			echo 'device type not identified';
 			exit 2
 		fi
 		clear_device # set size and format DEVICE
-	#	LOGS=create_or_read_logs()
-	#	generate_musics(DEVICE_SIZE,LOGS) # reads LOGS fills: MUSICS, LOGS
+		create_or_read_logs # fills LOGS and sets LOGS_DIR
+	#	generate_musics(DEVICE_SIZE,LOGS) # reads LOGS fills: MUSICS, LOGS	#	output_into_dir(MUSICS) # optional: put the musics generated in a directory
 	#	fill_device()
 		exit 0
 	fi
@@ -236,4 +268,3 @@ main
 #    then
 #		echo "$line";
 #	fi
-#done
