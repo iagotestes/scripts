@@ -78,7 +78,7 @@ function generate_musics()
 	#FIND MUSICS IN THE DIRECTORY
 	while IFS= read -r line; do
 		MUSICS+=( "$line" )
-	done < <( find . -type f -iname *.mp3  -exec ls -l {}  \; | awk '{$1=$2=$3=$4=$6=$7=$8=""; print $0}' ) 
+	done < <( find . -type f -iname "*.mp3"  -exec ls -l --escape {}  \; | awk '{$1=$2=$3=$4=$6=$7=$8=""; print $0}' ) 
 	#SET THE CURRENT MUSIC SIZE
 	NUM_MUSICS="${#MUSICS[@]}"
 
@@ -256,6 +256,30 @@ function create_or_read_logs()
 		
 }
 
+function fill_folder()
+{
+	#TODO: CLEAN DIRECTORY IF IT IS EXISTS AND HAS MUSICS
+	#CREATE FOLDER
+	mkdir -p ./MUSICS_OUT
+	
+	#FILL FOLDER WITH COPYS OF THE MUSICS 
+	for sm in "${MUSICS_OUT[@]}"; do 
+		#a=
+		echo $sm | awk '{$1=""; print $0}' | xargs -I {} cp {} ./MUSICS_OUT/	
+	#	cp "${a@Q}" ./MUSICS_OUT/
+		#echo "$a"
+
+	done
+
+#	while IFS= read -r line; do
+#		m=`echo "$line" | awk '{$1=""; print $0}'` 
+ #       	cp "\"$m\"" ./MUSICS_OUT/
+  #      done < <( $MUSICS_OUT[@] ) 
+
+
+
+}
+
 function main()
 {
 #	verify_devices
@@ -275,9 +299,11 @@ function main()
 	#	clear_device # set size and format DEVICE
 	#	create_or_read_logs # fills LOGS and sets LOGS_DIR
 		
-		DEVICE_SIZE=8036290560
+		# DEVICE_SIZE=8036290560
+		DEVICE_SIZE=1900000000
 
 		generate_musics  # (DEVICE_SIZE,LOGS)  reads LOGS fills: MUSICS, LOGS	#	output_into_dir(MUSICS) # optional: put the musics generated in a directory
+		fill_folder
 	#	fill_device()
 		#TODO: UMOUNT DEVICE AND DELETE ITS MOUNTED FOLDER AND EJECT DISK
 		# TODO: exit 0
